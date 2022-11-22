@@ -26,14 +26,14 @@ getMetadata();*/
      out the list in RGB format
 */
 //DO NOT TOUCH, THIS WORKS ALREADY
+//Note: requires web address 
 function toRGB(){
      // regex via http://stackoverflow.com/a/7543829/149636
      let rgbRegex = /^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d+(?:\.\d+)?))?\)$/;
-     let colorList = [], colorArr = [], pureValArr = [], changedColor = [];
+     let originalValues = [], valueArr = [], passValues = [];
      let elemStyles, cssName, cssValue, rgbVal;
      let elements = document.getElementsByTagName('*');
      let total = elements.length;
-     let darknessDifferential = 0.15, darkReversal = 3;
      for(let x = 0; x < total; x++){
           elemStyles = window.getComputedStyle(elements[x]);
           for(let y = 0; y < elemStyles.length; y++){
@@ -45,67 +45,94 @@ function toRGB(){
                rgbVal = cssValue.match(rgbRegex);
                if(!rgbVal)                                  //If no color exists
                     continue;                               //move onto the next element
-               if(colorList.indexOf(rgbVal.input) == -1)    //Avoids multiple entries
-                    colorList.push(rgbVal.input);           //If there are multiple elements using the same color,
+               if(originalValues.indexOf(rgbVal.input) == -1)    //Avoids multiple entries
+                    originalValues.push(rgbVal.input);           //If there are multiple elements using the same color,
           }                                                 //It would be unneccessary to have multiple elements in a list
      }
-     //This gets pure values
-     for(i in colorList){
-          let rgb = colorList[i];
-          colorArr = rgb
+     for(i in originalValues){
+          let rgb = originalValues[i];
+          //valueArr grabs pure numerical values
+          valueArr = rgb
                     .slice(rgb.indexOf("(") + 1, rgb.indexOf(")"))
                     .split(", ");
-          pureValArr.push(colorArr);
-     }
-/*     for(let i = 0; i < pureValArr.length; i++){
-          let f = pureValArr[i];
-          let r = changedColor[i];
-          if(parseInt(f[0])>= 178 || parseInt(f[1])>= 178 || parseInt(f[2]) >= 178){
-               parseInt(r[0])*darknessDifferential;
-               parseInt(r[1])*darknessDifferential;
-               parseInt(r[2])*darknessDifferential;
-          }else if((pureValArr[i][0] || pureValArr[i][1] || pureValArr[i][2]) <= 78){
-               (changedColor[i][0], changedColor[i][1], changedColor[i][2]) * darkReversal;
-          }
-          if(pureValArr[i][0] === '0' && pureValArr[i][1] === '0' && pureValArr[i][2] === '0'){
-               changedColor[i][0] = changedColor[i][1] = changedColor[i][2] = '255';
-          } else if((pureValArr[i][0] && pureValArr[i][1] && pureValArr[i][2])=== '255'){
-               changedColor[i][0] = changedColor[i][1] = changedColor[i][2] = '25';
+          //Darkness Differential Factor; an integer
+          let DDF = parseInt(valueArr[0]) + parseInt(valueArr[1]) + parseInt(valueArr[2]);
+          if(DDF < 255){     //Make light
+               passValues.push(pSBC(0.7, rgb)); 
+          } else if(DDF >= 255){   //Make dark
+               passValues.push(pSBC(-0.7, rgb));
           }
      }
-     */
-     console.log(pureValArr);
+     return {
+          originalValues,
+          passValues,
+     };
 }
-/*
-Step 3: TRANSFER ALL VALUES OF RGB INTO A LIST
-	Note: Anything above 178 will drop to below 77
-		 Anything below 77 will be above 178
-		 Nothing between 77 and 178 will change
-		 Starting at 15% darkness differential
-/*
-Step 4: Convert all list instances of rgb and rgba values 
+function insertNewValues(){
+     let newValues = toRGB().passValues,
+          checkVals = toRGB().originalValues;
+     let rgbRegex = /^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d+(?:\.\d+)?))?\)$/;
+     let elemStyles, cssName, cssValue, rgbVal;
+     let elements = document.getElementsByTagName('*');
+     let total = elements.length;
+     let orig = [];
+     for(let x = 0; x < total; x++){
+          elemStyles = window.getComputedStyle(elements[x]);
+          for(let y = 0; y < elemStyles.length; y++){
+               cssName = elemStyles[y];
+               cssValue = elemStyles[cssName];
+               if(!cssValue)
+                    continue;
+               cssValue += "";
+               rgbVal = cssValue.match(rgbRegex);
+               if(!rgbVal)
+                    continue;
+               if(orig.indexOf(rgbVal.input) == -1)    //Avoids multiple entries
+                    orig.push(rgbVal.input);
+          }
+     }
+}
+//This is what changes the color
+//THIS WORKS; DO NOT TOUCH
+const pSBC = (p,c0,c1) => {
+	let r, g, b, P, f, t, h, i=parseInt, m=Math.round, a=typeof(c1)=="string";
+	if(typeof(p)!="number"||p<-1||p>1||typeof(c0)!="string"||(c0[0]!='r'&&c0[0]!='#')||(c1&&!a))
+          return null;
+	if(!this.pSBCr)this.pSBCr=(d)=>{
+		let n = d.length;
+          x={};
+		if(n>9){
+			[r,g,b,a]=d=d.split(",");
+               n=d.length;
+			if(n<3||n>4)
+                    return null;
+			x.r = i(r[3]=="a"?r.slice(5):r.slice(4));
+               x.g = i(g);
+               x.b = i(b);
+               x.a = a?parseFloat(a):-1
+		}
+          return x;
+     };
+	h = c0.length>9;
+     h = a?c1.length>9?true:c1=="c"?!h:false:h;
+     f = pSBCr(c0);
+     P = p<0;
+     t = c1&&c1!="c"?pSBCr(c1):P?{r:0,g:0,b:0,a:-1}:{r:255,g:255,b:255,a:-1};
+     p = P?p*-1:p;
+     P=1-p;
+     r = m(P*f.r+p*t.r);
+     g = m(P*f.g+p*t.g);
+     b = m(P*f.b+p*t.b);
+	a = f.a;
+     t = t.a;
+     f = a>=0||t>=0;
+     a = f?a<0?t:t<0?a:a*P+t*p:0;
+	if(h)
+          return"rgb"+(f?"a(":"(")+r+","+g+","+b+(f?","+m(a*1000)/1000:"")+")";
+}
 
-THIS IS PSEUDOCODE TO WHAT VALUES WILL BE CHANGED
-NOTE: DARKNESS DIFFERENTIAL WILL BE SUBJECT TO CHANGE
-*/
+
 /*
+Step 4: Convert all list instances of rgb and rgba values - complete
 Step 5: Inject new colors into CSS
-
-THIS IS BROKEN CODE THAT IS USED TO INJECT CSS INTO A WEBSITE
-
-function setCssStyle(el, style, value){
-     let result = el.style.cssText.match(new RegExp("(?:[;\\s]|^)(" +
-          style.replace("-", "\\-") + "\\s*:(.*?)(;|$))")),
-          idx;
-     if(result){
-          idx = result.index + result[0].indexOf(result[1]);
-          el.style.cssText = el.style.cssText.substring(0, idx) +
-          style + ": " + value + ";" +
-          el.style.cssText.substring(idx + result[1].length);
-     } else{
-          el.style.cssText += " " + style + ": " + value + ";";
-     }
-}
-   var element = document.getElementById("wallIframe");
-   setCssStyle(element, "display","none !important");
 */
